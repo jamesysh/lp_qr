@@ -16,11 +16,10 @@ using namespace std;
 int main(){
  
     magma_init();
-cout<<a<<endl;
     double A[12] = {1,2,3,4,5,6,7,6,5,4,3,2};
     //matrix initializing
     double *B = new double[12];
-//    double *C = new double[12];
+    double *C = new double[12];
     magma_int_t m = 4;
     magma_int_t n = 3;
     magma_int_t lda = 4;
@@ -32,7 +31,7 @@ cout<<a<<endl;
     magma_queue_create(device, &queue_setmatrix);
     magma_setmatrix(m,n,sizeof(double),A,lda,B,lddb,queue_setmatrix); 
     double **B_array = &B;
-  //  magma_getmatrix(m,n,sizeof(double),B,lddb,C,lda,queue_setmatrix);
+
     //cout<<C[2]<<endl;
  
     
@@ -45,8 +44,13 @@ cout<<a<<endl;
     magma_queue_t queue_qr;
     magma_queue_create(device,&queue_qr);
     magma_dgeqrf_batched(m,n,B_array,lda,TAU,info,batchid,queue_qr);
+    magma_getmatrix(m,n,sizeof(double),B,lddb,C,lda,queue_setmatrix);
+   
+    for(int i=0;i<12;i++){
 
+	cout<<C[i]<<endl;
 
+}
 
     magma_finalize();
 
