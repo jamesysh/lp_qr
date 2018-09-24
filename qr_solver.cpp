@@ -21,11 +21,12 @@ int main(){
     int n = 3;
     int lda = 4;
     int lddb = 4;
-
     int device = 0;
+
     magma_queue_t queue_setmatrix;
+    //set up magma queue
     magma_queue_create(device, &queue_setmatrix);
-   
+    magma_setmatrix(m,n,sizeof(double),A,lda,B,lddb,queue_setmatrix); 
     
     
    
