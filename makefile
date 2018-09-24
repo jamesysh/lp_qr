@@ -8,4 +8,4 @@ CFLAGS = $(DEBUG) $(INCS) $(LIBS)
 
 all: qr
 qr: qr_solver.cpp
-	$(CC) $(CFLAGS) -o -lcudart -lcublas -lcusolver -lmagma
+	$(CC) $(CFLAGS) -o qr -lcudart -lcublas -lcusolver -lmagma
