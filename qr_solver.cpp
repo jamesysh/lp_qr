@@ -8,7 +8,6 @@
 #include<iostream>
 #include <cuda.h>
 #include <cublas_v2.h>
-#include <magma.h>
 #include <magma_lapack.h>
 #include <magma_v2.h>
 using namespace std;
@@ -31,7 +30,7 @@ int main(){
     
    
 
-    return 0
+    return 0;
 
 
 
