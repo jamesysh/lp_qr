@@ -7,6 +7,7 @@
 
 #include<iostream>
 #include <cuda.h>
+#include <cuda_runtime_api.h>
 #include <cublas_v2.h>
 #include <magma_lapack.h>
 #include <magma_v2.h>
@@ -14,86 +15,98 @@ using namespace std;
 
 
 int main(){
- 
+
     magma_init();
-    double A[12] = {1,2,3,4,5,6,7,6,5,4,3,2};
-    double D[12] = {5,4,7,8,0,1,4,2,6,8,4,1};
-    //matrix initializing
-    double *C_out1 ;
-    double *C_out2;
-    double* B_array[2];
-    magma_int_t m = 4;
-    magma_int_t n = 3;
-
-    magma_dmalloc(&B_array[0],m*n);
-    magma_dmalloc(&B_array[1],m*n);
-   
-    magma_int_t lda = 4;
-    magma_int_t lddb = 4;
-    magma_int_t device = 0;
-    cout<<"init success"<<endl;
-    ;
-    cout<<"B success"<<endl; 
-    magma_dmalloc_cpu(&C_out1,m*n);
-    magma_dmalloc_cpu(&C_out2,m*n);
-    cout<<"C success"<<endl;
-    magma_queue_t queue_setmatrix = NULL;
-    cout<<"allocate success"<<endl;
-    //set up magma queue
-    magma_queue_create(device, &queue_setmatrix);
-    magma_setmatrix(m,n,sizeof(double),A,lda,B_array[0],lddb,queue_setmatrix); 
-    magma_setmatrix(m,n,sizeof(double),D,lda,B_array[1],lddb,queue_setmatrix);
-    cout<<"B value success"<<endl;
-   
-    magma_getmatrix(m,n,sizeof(double),B_array[1],lddb,C_out1,lda,queue_setmatrix);
-   magma_queue_sync(queue_setmatrix );
-
- for(int i=0;i<12;i++){
-
-	cout<<C_out1[i]<<endl;
-
-}
-
-   
+    magma_int_t dev_t;
+    magma_getdevice(&dev_t);
+    magma_queue_t queue_qr = NULL;
+    magma_int_t dev = dev_t;
+    magma_queue_create(dev,&queue_qr);
+    //set up device and queue
+    magma_int_t m = 9;
+    magma_int_t n = 5;
+    magma_int_t mn = m*n;
+    magma_int_t min_mn = min(m,n);
+    magma_int_t lda = 9;
+    int num  = 10;
+//array of pointers on cpu
+    double* a[num];
+    for(int i=0;i<num;i++){
+  	 a[i] = new double[mn];
+    }
+    //initialize matrix
+    for(int j=0;j<num;j++){
+         for(int i=0;i<mn;++i){
+       		 a[j][i] = i+j;
+    	 }
+    }
+//array of points in gpu
+    double** B_array;
+    cudaMalloc((void**)&B_array,num*sizeof(double*));
+    double *tem_B[num];
+    for(int i=0;i<num;i++){
+	cudaMalloc((void**)&tem_B[i],sizeof(double)*mn);
     
-    //cout<<C[2]<<endl;
- 
+	}
+    cout<<"----------------------------Coefficient matrices-------------------------------------------"<<endl;
+    for(int i=0;i<num;i++){
+        cudaMemcpy(tem_B[i], a[i], mn*sizeof(double), cudaMemcpyHostToDevice);
+        magma_dprint_gpu(m,n,tem_B[i],lda,queue_qr);
+    }	
+    cudaMemcpy(B_array, tem_B, sizeof(tem_B), cudaMemcpyHostToDevice);
+
+
+    cout<<"----------------------------------init success----------------------------------------------"<<endl;
+
+   
     
    //----------------qr----------------------------
-    
-    double *TAU[2];
-    magma_dmalloc_cpu(&TAU[1],3);
-    magma_dmalloc_cpu(&TAU[0],3);
-    magma_int_t info[2];
-    magma_int_t batchid = 2;
-    
-    cout<<"QRi computation "<<endl;
-    magma_dgeqrf_batched(m,n,B_array,4,TAU,info,batchid,queue_setmatrix);
-    cout<<info[0]<<endl;
-    magma_queue_sync(queue_setmatrix );
-    magma_getmatrix(m,n,sizeof(double),B_array[1],lddb,C_out1,lda,queue_setmatrix);
-     magma_queue_sync(queue_setmatrix );
-    for(int i=0;i<12;i++){
-
-	cout<<C_out1[i]<<endl;
-
-
+//variables need by qr    
+    double **Tau;
+    cudaMalloc((void**)&Tau,num*sizeof(double*));
+    double* tem_T[num];
+    for(int i=0;i<num;i++){
+        cudaMalloc((void**)&tem_T[i],sizeof(double)*min_mn);
     }
 
-    free(C_out1);
-    free(C_out2);
-    for (int i=0;i<2;i++){
-    magma_free(B_array[i]);
-    }
-    magma_queue_destroy(queue_setmatrix);
 
+
+    cudaMemcpy(Tau, tem_T, sizeof(tem_T), cudaMemcpyHostToDevice);  
+    magma_int_t* info;
+    cudaMalloc((void**)&info,num*sizeof(magma_int_t));
+    magma_int_t batchid = num;
+   
+	
+    cout<<"---------------------------------QR computation results----------------------------------- "<<endl;
+    magma_dgeqrf_batched(m,n,B_array,lda,Tau,info,batchid,queue_qr);
+    magma_queue_sync(queue_qr);
+    for(int i=0;i<num;i++){
+        magma_dprint_gpu(m,n,tem_B[i],lda,queue_qr);
+    }
+    for(int i=0;i<num;i++){
+       free(a[i]);
+        }
+
+    for(int i=0;i<num;i++){
+        cudaFree(tem_B[i]);
+        }
+    cudaFree(B_array);
+
+    for(int i=0;i<num;i++){
+        cudaFree(tem_T[i]);
+        }
+    cudaFree(Tau);
+    cudaFree(info);
+
+  
+
+
+
+    magma_queue_destroy(queue_qr);
     magma_finalize();
 
-    return 0;
 
-
+    return EXIT_SUCCESS;
 
 }
-
-
 
